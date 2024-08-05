@@ -54,6 +54,18 @@ func resourceCloudStackInstance() *schema.Resource {
 				Computed: true,
 			},
 
+			"account": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
+			"domain_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
 			"service_offering": {
 				Type:     schema.TypeString,
 				Required: true,
@@ -241,6 +253,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 
 	// Create a new parameter struct
 	p := cs.VirtualMachine.NewDeployVirtualMachineParams(serviceofferingid, templateid, zone.Id)
+
 	p.SetStartvm(d.Get("start_vm").(bool))
 	vmDetails := make(map[string]string)
 	if details, ok := d.GetOk("details"); ok {
@@ -281,6 +294,10 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		p.SetDisplayname(displayname.(string))
 	} else if hasName {
 		p.SetDisplayname(name.(string))
+	}
+
+	if account, ok := d.GetOk("account"); ok {
+		p.SetAccount(account.(string))
 	}
 
 	// If there is a root_disk_size supplied, add it to the parameter struct
@@ -346,6 +363,11 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 
 	// If there is a project supplied, we retrieve and set the project id
 	if err := setProjectid(p, cs, d); err != nil {
+		return err
+	}
+
+	// If there is a project supplied, we retrieve and set the project id
+	if err := setDomainid(p, cs, d); err != nil {
 		return err
 	}
 

@@ -171,6 +171,48 @@ func TestAccCloudStackInstance_project(t *testing.T) {
 	})
 }
 
+func TestAccCloudStackInstance_account(t *testing.T) {
+	var instance cloudstack.VirtualMachine
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCloudStackInstance_account,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackInstanceExists(
+						"cloudstack_instance.foobar", &instance),
+					resource.TestCheckResourceAttr(
+						"cloudstack_instance.foobar", "account", "terraform"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccCloudStackInstance_domain_id(t *testing.T) {
+	var instance cloudstack.VirtualMachine
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackInstanceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCloudStackInstance_domain_id,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackInstanceExists(
+						"cloudstack_instance.foobar", &instance),
+					resource.TestCheckResourceAttr(
+						"cloudstack_instance.foobar", "domain_id", "terraform"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccCloudStackInstance_import(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -417,6 +459,46 @@ resource "cloudstack_network" "foo" {
   cidr = "10.1.1.0/24"
   network_offering = "DefaultIsolatedNetworkOfferingWithSourceNatService"
   project = "terraform"
+  zone = "Sandbox-simulator"
+}
+
+resource "cloudstack_instance" "foobar" {
+  name = "terraform-test"
+  display_name = "terraform-test"
+  service_offering= "Small Instance"
+  network_id = "${cloudstack_network.foo.id}"
+  template = "CentOS 5.6 (64-bit) no GUI (Simulator)"
+  project = "terraform"
+  zone = "${cloudstack_network.foo.zone}"
+  expunge = true
+}`
+
+const testAccCloudStackInstance_account = `
+resource "cloudstack_network" "foo" {
+  name = "terraform-network"
+  cidr = "10.1.1.0/24"
+  network_offering = "DefaultIsolatedNetworkOfferingWithSourceNatService"
+  project = "terraform"
+  zone = "Sandbox-simulator"
+}
+
+resource "cloudstack_instance" "foobar" {
+  name = "terraform-test"
+  display_name = "terraform-test"
+  service_offering= "Small Instance"
+  network_id = "${cloudstack_network.foo.id}"
+  template = "CentOS 5.6 (64-bit) no GUI (Simulator)"
+  account = "terraform"
+  zone = "${cloudstack_network.foo.zone}"
+  expunge = true
+}`
+
+const testAccCloudStackInstance_domain_id = `
+resource "cloudstack_network" "foo" {
+  name = "terraform-network"
+  cidr = "10.1.1.0/24"
+  network_offering = "DefaultIsolatedNetworkOfferingWithSourceNatService"
+  domain_id = "terraform"
   zone = "Sandbox-simulator"
 }
 
