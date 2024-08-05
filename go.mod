@@ -1,5 +1,8 @@
 module github.com/lucasdk3/terraform-provider-cloudstack
 
+go 1.22
+
+
 require (
 	github.com/apache/cloudstack-go/v2 v2.13.2
 	github.com/go-ini/ini v1.67.0
@@ -66,5 +69,3 @@ require (
 	google.golang.org/genproto v0.0.0-20190201180003-4b09977fb922 // indirect
 	google.golang.org/grpc v1.18.0 // indirect
 )
-
-go 1.22
