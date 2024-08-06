@@ -160,8 +160,8 @@ func setProjectid(p cloudstack.ProjectIDSetter, cs *cloudstack.CloudStackClient,
 
 // If there is a domain supplied, we retrieve and set the domain id
 func setDomainid(p cloudstack.DomainIDSetter, cs *cloudstack.CloudStackClient, d *schema.ResourceData) error {
-	if domain, ok := d.GetOk("domain_id"); ok {
-		domainId, e := retrieveID(cs, "domain_id", domain.(string))
+	if domain, ok := d.GetOk("domain"); ok {
+		domainId, e := retrieveID(cs, "domain", domain.(string))
 		if e != nil {
 			return e.Error()
 		}

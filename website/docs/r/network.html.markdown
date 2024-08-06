@@ -31,6 +31,10 @@ The following arguments are supported:
 
 * `display_text` - (Optional) The display text of the network.
 
+* `account` - (Optional) The account where will created the instance.
+
+* `domain` - (Optional) The domain id where will created the instance.
+
 * `cidr` - (Required) The CIDR block for the network. Changing this forces a new
     resource to be created.
 

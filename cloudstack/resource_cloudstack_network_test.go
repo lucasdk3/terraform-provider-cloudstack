@@ -70,6 +70,48 @@ func TestAccCloudStackNetwork_project(t *testing.T) {
 	})
 }
 
+func TestAccCloudStackNetwork_account(t *testing.T) {
+	var network cloudstack.Network
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackNetworkDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCloudStackNetwork_account,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackNetworkExists(
+						"cloudstack_network.foo", &network),
+					resource.TestCheckResourceAttr(
+						"cloudstack_network.foo", "account", "terraform"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccCloudStackNetwork_domain(t *testing.T) {
+	var network cloudstack.Network
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackNetworkDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCloudStackNetwork_domain,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckCloudStackNetworkExists(
+						"cloudstack_network.foo", &network),
+					resource.TestCheckResourceAttr(
+						"cloudstack_network.foo", "domain", "terraform"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccCloudStackNetwork_vpc(t *testing.T) {
 	var network cloudstack.Network
 
@@ -146,6 +188,46 @@ func TestAccCloudStackNetwork_importProject(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCloudStackNetwork_project,
+			},
+
+			{
+				ResourceName:        "cloudstack_network.foo",
+				ImportState:         true,
+				ImportStateIdPrefix: "terraform/",
+				ImportStateVerify:   true,
+			},
+		},
+	})
+}
+
+func TestAccCloudStackNetwork_importAccount(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackNetworkDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCloudStackNetwork_account,
+			},
+
+			{
+				ResourceName:        "cloudstack_network.foo",
+				ImportState:         true,
+				ImportStateIdPrefix: "terraform/",
+				ImportStateVerify:   true,
+			},
+		},
+	})
+}
+
+func TestAccCloudStackNetwork_importDomain(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckCloudStackNetworkDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCloudStackNetwork_domain,
 			},
 
 			{
@@ -275,6 +357,24 @@ resource "cloudstack_network" "foo" {
   cidr = "10.1.1.0/24"
   network_offering = "DefaultIsolatedNetworkOfferingWithSourceNatService"
   project = "terraform"
+  zone = "Sandbox-simulator"
+}`
+
+const testAccCloudStackNetwork_account = `
+resource "cloudstack_network" "foo" {
+  name = "terraform-network"
+  cidr = "10.1.1.0/24"
+  network_offering = "DefaultIsolatedNetworkOfferingWithSourceNatService"
+  account = "terraform"
+  zone = "Sandbox-simulator"
+}`
+
+const testAccCloudStackNetwork_domain = `
+resource "cloudstack_network" "foo" {
+  name = "terraform-network"
+  cidr = "10.1.1.0/24"
+  network_offering = "DefaultIsolatedNetworkOfferingWithSourceNatService"
+  domain = "terraform"
   zone = "Sandbox-simulator"
 }`
 

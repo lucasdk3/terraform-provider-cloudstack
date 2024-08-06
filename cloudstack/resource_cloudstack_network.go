@@ -131,6 +131,20 @@ func resourceCloudStackNetwork() *schema.Resource {
 				ForceNew: true,
 			},
 
+			"account": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+				ForceNew: true,
+			},
+
+			"domain": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+				ForceNew: true,
+			},
+
 			"source_nat_ip": {
 				Type:     schema.TypeBool,
 				Optional: true,
@@ -215,6 +229,11 @@ func resourceCloudStackNetworkCreate(d *schema.ResourceData, meta interface{}) e
 		p.SetNetworkdomain(networkDomain.(string))
 	}
 
+	// Set the account if we have one
+	if account, ok := d.GetOk("account"); ok {
+		p.SetAccount(account.(string))
+	}
+
 	if vlan, ok := d.GetOk("vlan"); ok {
 		p.SetVlan(strconv.Itoa(vlan.(int)))
 	}
@@ -233,6 +252,11 @@ func resourceCloudStackNetworkCreate(d *schema.ResourceData, meta interface{}) e
 
 	// If there is a project supplied, we retrieve and set the project id
 	if err := setProjectid(p, cs, d); err != nil {
+		return err
+	}
+
+	// If there is a project supplied, we retrieve and set the project id
+	if err := setDomainid(p, cs, d); err != nil {
 		return err
 	}
 
@@ -255,6 +279,8 @@ func resourceCloudStackNetworkCreate(d *schema.ResourceData, meta interface{}) e
 	d.SetPartial("acl_id")
 	d.SetPartial("project")
 	d.SetPartial("zone")
+	d.SetPartial("account")
+	d.SetPartial("domain")
 
 	d.SetId(r.Id)
 
@@ -279,6 +305,11 @@ func resourceCloudStackNetworkCreate(d *schema.ResourceData, meta interface{}) e
 
 		// If there is a project supplied, we retrieve and set the project id
 		if err := setProjectid(p, cs, d); err != nil {
+			return err
+		}
+
+		// If there is a domain supplied, we retrieve and set the domain id
+		if err := setDomainid(p, cs, d); err != nil {
 			return err
 		}
 
@@ -307,6 +338,7 @@ func resourceCloudStackNetworkRead(d *schema.ResourceData, meta interface{}) err
 	n, count, err := cs.Network.GetNetworkByID(
 		d.Id(),
 		cloudstack.WithProject(d.Get("project").(string)),
+		cloudstack.WithDomain(d.Get("domain").(string)),
 	)
 	if err != nil {
 		if count == 0 {
@@ -338,6 +370,9 @@ func resourceCloudStackNetworkRead(d *schema.ResourceData, meta interface{}) err
 	d.Set("tags", tags)
 
 	setValueOrID(d, "network_offering", n.Networkofferingname, n.Networkofferingid)
+	setValueOrID(d, "project", n.Project, n.Projectid)
+	setValueOrID(d, "domain", n.Domain, n.Domainid)
+	setValueOrID(d, "account", n.Account, n.Account)
 	setValueOrID(d, "project", n.Project, n.Projectid)
 	setValueOrID(d, "zone", n.Zonename, n.Zoneid)
 

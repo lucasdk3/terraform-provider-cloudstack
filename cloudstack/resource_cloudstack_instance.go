@@ -60,7 +60,7 @@ func resourceCloudStackInstance() *schema.Resource {
 				Computed: true,
 			},
 
-			"domain_id": {
+			"domain": {
 				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
@@ -366,7 +366,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		return err
 	}
 
-	// If there is a project supplied, we retrieve and set the project id
+	// If there is a domain supplied, we retrieve and set the domain id
 	if err := setDomainid(p, cs, d); err != nil {
 		return err
 	}
@@ -431,6 +431,7 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	vm, count, err := cs.VirtualMachine.GetVirtualMachineByID(
 		d.Id(),
 		cloudstack.WithProject(d.Get("project").(string)),
+		cloudstack.WithDomain(d.Get("domain").(string)),
 	)
 	if err != nil {
 		if count == 0 {
@@ -513,6 +514,8 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 	setValueOrID(d, "service_offering", vm.Serviceofferingname, vm.Serviceofferingid)
 	setValueOrID(d, "template", vm.Templatename, vm.Templateid)
 	setValueOrID(d, "project", vm.Project, vm.Projectid)
+	setValueOrID(d, "domain", vm.Domain, vm.Domainid)
+	setValueOrID(d, "account", vm.Account, vm.Account)
 	setValueOrID(d, "zone", vm.Zonename, vm.Zoneid)
 
 	return nil
@@ -673,6 +676,12 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 			if err := setProjectid(p, cs, d); err != nil {
 				return err
 			}
+
+			// If there is a project supplied, we retrieve and set the project id
+			if err := setDomainid(p, cs, d); err != nil {
+				return err
+			}
+
 			// Change the ssh keypair
 			_, err = cs.SSH.ResetSSHKeyForVirtualMachine(p)
 			if err != nil {

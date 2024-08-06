@@ -26,7 +26,7 @@ resource "cloudstack_domain" "example" {
 The following arguments are supported:
 
 * `name` - (Required) The name of the domain.
-* `domain_id` - (Optional) The ID of the domain.
+* `domain` - (Optional) The ID of the domain.
 * `network_domain` - (Optional) The network domain for the domain.
 * `parent_domain_id` - (Optional) The ID of the parent domain.
 

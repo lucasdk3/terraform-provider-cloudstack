@@ -206,7 +206,7 @@ func TestAccCloudStackInstance_domain_id(t *testing.T) {
 					testAccCheckCloudStackInstanceExists(
 						"cloudstack_instance.foobar", &instance),
 					resource.TestCheckResourceAttr(
-						"cloudstack_instance.foobar", "domain_id", "terraform"),
+						"cloudstack_instance.foobar", "domain", "terraform"),
 				),
 			},
 		},
@@ -498,7 +498,7 @@ resource "cloudstack_network" "foo" {
   name = "terraform-network"
   cidr = "10.1.1.0/24"
   network_offering = "DefaultIsolatedNetworkOfferingWithSourceNatService"
-  domain_id = "terraform"
+  domain = "terraform"
   zone = "Sandbox-simulator"
 }
 

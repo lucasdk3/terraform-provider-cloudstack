@@ -31,6 +31,10 @@ The following arguments are supported:
 
 * `display_name` - (Optional) The display name of the instance.
 
+* `account` - (Optional) The account where will created the instance.
+
+* `domain` - (Optional) The domain id where will created the instance.
+
 * `service_offering` - (Required) The name or ID of the service offering used
     for this instance.
 
