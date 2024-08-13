@@ -1,3 +1,9 @@
+## 0.4.3 (Unreleased)
+
+IMPROVEMENTS:
+
+* Removed requirement of cidr in cloudstack_resource_network
+
 ## 0.4.2 (Unreleased)
 
 IMPROVEMENTS:

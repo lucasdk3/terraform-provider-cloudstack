@@ -71,14 +71,11 @@ func resourceCloudStackInstance() *schema.Resource {
 				Required: true,
 			},
 
-			"network_ids": {
-				Type:     schema.TypeList,
+			"network_id": {
+				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
 				ForceNew: true,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
 			},
 
 			"ip_address": {
@@ -315,7 +312,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 
 	if zone.Networktype == "Advanced" {
 		// Set the default network ID
-		p.SetNetworkids(d.Get("network_ids").([]string))
+		p.SetNetworkids([]string{d.Get("network_id").(string)})
 	}
 
 	// If there is a ipaddres supplied, add it to the parameter struct
