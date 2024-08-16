@@ -76,7 +76,6 @@ func resourceCloudStackInstance() *schema.Resource {
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Optional: true,
 				Computed: true,
-				ForceNew: true,
 				Set:      schema.HashString,
 			},
 
@@ -686,6 +685,24 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 
 			// Encontrar redes adicionadas (estão no novo estado, mas não no antigo)
 			addedNetworks := newSet.Difference(oldSet)
+
+			// if len(removedNetworks.List()) > 0 {
+			// 	vm, count, err := cs.VirtualMachine.GetVirtualMachineByID(
+			// 		d.Id(),
+			// 		cloudstack.WithProject(d.Get("project").(string)),
+			// 		cloudstack.WithDomain(d.Get("domain").(string)),
+			// 	)
+			// 	if err != nil {
+			// 		if count == 0 {
+			// 			log.Printf("[DEBUG] Instance %s does no longer exist", d.Get("name").(string))
+			// 			d.SetId("")
+			// 			return nil
+			// 		}
+
+			// 		return err
+			// 	}
+
+			// }
 
 			// Remover NICs das redes que foram removidas
 			for _, networkID := range removedNetworks.List() {
