@@ -323,6 +323,13 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	if zone.Networktype == "Advanced" {
+		if netIds := d.Get("network_ids").(*schema.Set); netIds.Len() > 0 {
+			var networkIds []string
+			for _, networkId := range netIds.List() {
+				networkIds = append(networkIds, networkId.(string))
+			}
+			p.SetAffinitygroupids(networkIds)
+		}
 		// Set the default network ID
 		p.SetNetworkids(d.Get("network_ids").([]string))
 	}
