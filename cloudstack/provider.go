@@ -109,6 +109,7 @@ func Provider() terraform.ResourceProvider {
 			"cloudstack_network_acl":          resourceCloudStackNetworkACL(),
 			"cloudstack_network_acl_rule":     resourceCloudStackNetworkACLRule(),
 			"cloudstack_nic":                  resourceCloudStackNIC(),
+			"cloudstack_unique_nic":           resourceCloudStackUniqueNIC(),
 			"cloudstack_port_forward":         resourceCloudStackPortForward(),
 			"cloudstack_private_gateway":      resourceCloudStackPrivateGateway(),
 			"cloudstack_secondary_ipaddress":  resourceCloudStackSecondaryIPAddress(),

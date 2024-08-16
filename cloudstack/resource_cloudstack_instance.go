@@ -467,8 +467,20 @@ func resourceCloudStackInstanceRead(d *schema.ResourceData, meta interface{}) er
 
 	// In some rare cases (when destroying a machine fails) it can happen that
 	// an instance does not have any attached NIC anymore.
+
+	if _, ok := d.GetOk("affinity_group_ids"); ok {
+		groups := &schema.Set{F: schema.HashString}
+		for _, group := range vm.Affinitygroup {
+			groups.Add(group.Id)
+		}
+		d.Set("affinity_group_ids", groups)
+	}
 	if len(vm.Nic) > 0 {
-		d.Set("network_id", vm.Nic[0].Networkid)
+		nics := &schema.Set{F: schema.HashString}
+		for _, nic := range vm.Nic {
+			nics.Add(nic.Networkid)
+		}
+		d.Set("network_ids", nics)
 		d.Set("ip_address", vm.Nic[0].Ipaddress)
 	}
 
@@ -585,7 +597,7 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 	}
 
 	// Attributes that require reboot to update
-	if d.HasChange("name") || d.HasChange("service_offering") || d.HasChange("affinity_group_ids") ||
+	if d.HasChange("name") || d.HasChange("service_offering") || d.HasChange("affinity_group_ids") || d.HasChange("network_ids") ||
 		d.HasChange("affinity_group_names") || d.HasChange("keypair") || d.HasChange("user_data") {
 		// Before we can actually make these changes, the virtual machine must be stopped
 		_, err := cs.VirtualMachine.StopVirtualMachine(
@@ -658,6 +670,44 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 					"Error updating the affinity groups for instance %s: %s", name, err)
 			}
 			d.SetPartial("affinity_group_ids")
+		}
+
+		if d.HasChange("network_ids") {
+
+			// Obter a diferença entre o estado antigo e o novo
+			oldNetworkIds, newNetworkIds := d.GetChange("network_ids")
+
+			// Converter os valores antigos e novos em sets para fácil comparação
+			oldSet := oldNetworkIds.(*schema.Set)
+			newSet := newNetworkIds.(*schema.Set)
+
+			// Encontrar redes removidas (estavam no estado antigo, mas não no novo)
+			removedNetworks := oldSet.Difference(newSet)
+
+			// Encontrar redes adicionadas (estão no novo estado, mas não no antigo)
+			addedNetworks := newSet.Difference(oldSet)
+
+			// Remover NICs das redes que foram removidas
+			for _, networkID := range removedNetworks.List() {
+				log.Printf("[INFO] Removing network: %s from VM: %s", networkID.(string), d.Id())
+				removeNicParams := cs.VirtualMachine.NewRemoveNicFromVirtualMachineParams(d.Id(), networkID.(string))
+				_, err := cs.VirtualMachine.RemoveNicFromVirtualMachine(removeNicParams)
+				if err != nil {
+					return fmt.Errorf("error removing NIC for network %s from instance %s: %s", networkID, d.Id(), err)
+				}
+			}
+
+			// Adicionar NICs das redes que foram adicionadas
+			for _, networkID := range addedNetworks.List() {
+				log.Printf("[INFO] Adding network: %s to VM: %s", networkID.(string), d.Id())
+				addNicParams := cs.VirtualMachine.NewAddNicToVirtualMachineParams(d.Id(), networkID.(string))
+				_, err := cs.VirtualMachine.AddNicToVirtualMachine(addNicParams)
+				if err != nil {
+					return fmt.Errorf("error adding NIC for network %s to instance %s: %s", networkID, d.Id(), err)
+				}
+			}
+
+			d.SetPartial("network_ids")
 		}
 
 		// Check if the affinity group names have changed and if so, update the names
