@@ -328,10 +328,8 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 			for _, networkId := range netIds.List() {
 				networkIds = append(networkIds, networkId.(string))
 			}
-			p.SetAffinitygroupids(networkIds)
+			p.SetNetworkids(networkIds)
 		}
-		// Set the default network ID
-		p.SetNetworkids(d.Get("network_ids").([]string))
 	}
 
 	// If there is a ipaddres supplied, add it to the parameter struct
