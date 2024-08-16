@@ -71,11 +71,13 @@ func resourceCloudStackInstance() *schema.Resource {
 				Required: true,
 			},
 
-			"network_id": {
-				Type:     schema.TypeString,
+			"network_ids": {
+				Type:     schema.TypeSet,
+				Elem:     &schema.Schema{Type: schema.TypeString},
 				Optional: true,
 				Computed: true,
 				ForceNew: true,
+				Set:      schema.HashString,
 			},
 
 			"ip_address": {
@@ -219,6 +221,12 @@ func resourceCloudStackInstance() *schema.Resource {
 				Optional: true,
 			},
 
+			"extra_config": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
 			"tags": tagsSchema(),
 		},
 	}
@@ -300,6 +308,10 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 		p.SetAccount(account.(string))
 	}
 
+	if extraConfig, ok := d.GetOk("extra_config"); ok {
+		p.SetExtraconfig(extraConfig.(string))
+	}
+
 	// If there is a root_disk_size supplied, add it to the parameter struct
 	if rootdisksize, ok := d.GetOk("root_disk_size"); ok {
 		p.SetRootdisksize(int64(rootdisksize.(int)))
@@ -312,7 +324,7 @@ func resourceCloudStackInstanceCreate(d *schema.ResourceData, meta interface{}) 
 
 	if zone.Networktype == "Advanced" {
 		// Set the default network ID
-		p.SetNetworkids([]string{d.Get("network_id").(string)})
+		p.SetNetworkids(d.Get("network_ids").([]string))
 	}
 
 	// If there is a ipaddres supplied, add it to the parameter struct
