@@ -83,7 +83,6 @@ func resourceCloudStackInstance() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
-				ForceNew: true,
 			},
 
 			"template": {
@@ -672,9 +671,10 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 		}
 
 		if d.HasChange("network_ids") {
-
 			// Obter a diferença entre o estado antigo e o novo
 			oldNetworkIds, newNetworkIds := d.GetChange("network_ids")
+			log.Printf("[DEBUG] Antigos network_ids: %v", oldNetworkIds)
+			log.Printf("[DEBUG] Novos network_ids: %v", newNetworkIds)
 
 			// Converter os valores antigos e novos em sets para fácil comparação
 			oldSet := oldNetworkIds.(*schema.Set)
@@ -682,45 +682,74 @@ func resourceCloudStackInstanceUpdate(d *schema.ResourceData, meta interface{}) 
 
 			// Encontrar redes removidas (estavam no estado antigo, mas não no novo)
 			removedNetworks := oldSet.Difference(newSet)
+			log.Printf("[DEBUG] Redes removidas: %v", removedNetworks.List())
 
 			// Encontrar redes adicionadas (estão no novo estado, mas não no antigo)
 			addedNetworks := newSet.Difference(oldSet)
+			log.Printf("[DEBUG] Redes adicionadas: %v", addedNetworks.List())
 
-			// if len(removedNetworks.List()) > 0 {
-			// 	vm, count, err := cs.VirtualMachine.GetVirtualMachineByID(
-			// 		d.Id(),
-			// 		cloudstack.WithProject(d.Get("project").(string)),
-			// 		cloudstack.WithDomain(d.Get("domain").(string)),
-			// 	)
-			// 	if err != nil {
-			// 		if count == 0 {
-			// 			log.Printf("[DEBUG] Instance %s does no longer exist", d.Get("name").(string))
-			// 			d.SetId("")
-			// 			return nil
-			// 		}
+			// Adicionar novos NICs (redes adicionadas)
+			for _, networkID := range addedNetworks.List() {
+				log.Printf("[INFO] Adding network: %s to VM: %s", networkID.(string), d.Id())
+				addNicParams := cs.VirtualMachine.NewAddNicToVirtualMachineParams(networkID.(string), d.Id())
+				_, err := Retry(10, retryableAddNicFunc(cs, addNicParams))
 
-			// 		return err
-			// 	}
-
-			// }
-
-			// Remover NICs das redes que foram removidas
-			for _, networkID := range removedNetworks.List() {
-				log.Printf("[INFO] Removing network: %s from VM: %s", networkID.(string), d.Id())
-				removeNicParams := cs.VirtualMachine.NewRemoveNicFromVirtualMachineParams(d.Id(), networkID.(string))
-				_, err := cs.VirtualMachine.RemoveNicFromVirtualMachine(removeNicParams)
 				if err != nil {
-					return fmt.Errorf("error removing NIC for network %s from instance %s: %s", networkID, d.Id(), err)
+					return fmt.Errorf("error adding NIC for network %s to instance %s: %s", networkID, d.Id(), err)
 				}
 			}
 
-			// Adicionar NICs das redes que foram adicionadas
-			for _, networkID := range addedNetworks.List() {
-				log.Printf("[INFO] Adding network: %s to VM: %s", networkID.(string), d.Id())
-				addNicParams := cs.VirtualMachine.NewAddNicToVirtualMachineParams(d.Id(), networkID.(string))
-				_, err := cs.VirtualMachine.AddNicToVirtualMachine(addNicParams)
+			vm, count, err := cs.VirtualMachine.GetVirtualMachineByID(
+				d.Id(),
+				cloudstack.WithProject(d.Get("project").(string)),
+				cloudstack.WithDomain(d.Get("domain").(string)),
+			)
+			if err != nil {
+				if count == 0 {
+					log.Printf("[DEBUG] Instance %s does no longer exist", d.Get("name").(string))
+					d.SetId("")
+					return nil
+				}
+				return err
+			}
+
+			// Remover NICs das redes removidas
+			for _, networkID := range removedNetworks.List() {
+				var nicId string
+				var anotherNicID string
+				var foundDefault bool
+
+				// Percorrer os NICs da VM para verificar qual é o default e definir um novo
+				for _, nic := range vm.Nic {
+					if nic.Networkid == networkID.(string) {
+						nicId = nic.Id
+
+						// Verificar se o NIC a ser removido é o default
+						if nic.Isdefault {
+							foundDefault = true
+						}
+					} else {
+						// Guardar outro NIC para caso precisemos definir como default
+						anotherNicID = nic.Id
+					}
+				}
+
+				// Se o NIC a ser removido for o default, definir outro NIC como default antes de remover
+				if foundDefault && anotherNicID != "" {
+					log.Printf("[INFO] Changing default NIC to %s before removing the current default", anotherNicID)
+					updateDefaultNicParams := cs.VirtualMachine.NewUpdateDefaultNicForVirtualMachineParams(anotherNicID, d.Id())
+					_, err := cs.VirtualMachine.UpdateDefaultNicForVirtualMachine(updateDefaultNicParams)
+					if err != nil {
+						return fmt.Errorf("error updating default NIC for instance %s: %s", d.Id(), err)
+					}
+				}
+
+				// Agora remover o NIC
+				log.Printf("[INFO] Removing network: %s from VM: %s", networkID.(string), d.Id())
+				removeNicParams := cs.VirtualMachine.NewRemoveNicFromVirtualMachineParams(nicId, d.Id())
+				_, err := cs.VirtualMachine.RemoveNicFromVirtualMachine(removeNicParams)
 				if err != nil {
-					return fmt.Errorf("error adding NIC for network %s to instance %s: %s", networkID, d.Id(), err)
+					return fmt.Errorf("error removing NIC for network %s from instance %s: %s", networkID, d.Id(), err)
 				}
 			}
 

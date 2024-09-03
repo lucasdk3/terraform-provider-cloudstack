@@ -1,17 +1,18 @@
-## 0.4.3 (Unreleased)
+## 0.5.0 (Sep 3, 2024)
+
+IMPROVEMENTS:
+
+* Using list of network_ids in vm
 
 IMPROVEMENTS:
 
 * Removed requirement of cidr in cloudstack_resource_network
 
-## 0.4.2 (Unreleased)
 
 IMPROVEMENTS:
 
 * Added parameters account and domain to cloudstack_resource_instance
 * Added parameters account and domain to cloudstack_resource_network
-
-## 0.4.0 (Unreleased)
 
 IMPROVEMENTS:
 
