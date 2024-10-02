@@ -44,6 +44,18 @@ func resourceCloudStackDisk() *schema.Resource {
 				ForceNew: true,
 			},
 
+			"account": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
+			"domain": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+
 			"attach": {
 				Type:     schema.TypeBool,
 				Optional: true,
@@ -121,6 +133,10 @@ func resourceCloudStackDiskCreate(d *schema.ResourceData, meta interface{}) erro
 	// Set the disk_offering ID
 	p.SetDiskofferingid(diskofferingid)
 
+	if account, ok := d.GetOk("account"); ok {
+		p.SetAccount(account.(string))
+	}
+
 	if d.Get("size").(int) != 0 {
 		// Set the volume size
 		p.SetSize(int64(d.Get("size").(int)))
@@ -128,6 +144,10 @@ func resourceCloudStackDiskCreate(d *schema.ResourceData, meta interface{}) erro
 
 	// If there is a project supplied, we retrieve and set the project id
 	if err := setProjectid(p, cs, d); err != nil {
+		return err
+	}
+
+	if err := setDomainid(p, cs, d); err != nil {
 		return err
 	}
 
@@ -183,6 +203,7 @@ func resourceCloudStackDiskRead(d *schema.ResourceData, meta interface{}) error 
 	v, count, err := cs.Volume.GetVolumeByID(
 		d.Id(),
 		cloudstack.WithProject(d.Get("project").(string)),
+		cloudstack.WithDomain(d.Get("domain").(string)),
 	)
 	if err != nil {
 		if count == 0 {
@@ -206,6 +227,8 @@ func resourceCloudStackDiskRead(d *schema.ResourceData, meta interface{}) error 
 	setValueOrID(d, "disk_offering", v.Diskofferingname, v.Diskofferingid)
 	setValueOrID(d, "project", v.Project, v.Projectid)
 	setValueOrID(d, "zone", v.Zonename, v.Zoneid)
+	setValueOrID(d, "domain", v.Domain, v.Domainid)
+	setValueOrID(d, "account", v.Account, v.Account)
 
 	if v.Virtualmachineid != "" {
 		d.Set("device_id", int(v.Deviceid))
@@ -407,6 +430,7 @@ func isAttached(d *schema.ResourceData, meta interface{}) (bool, error) {
 	v, _, err := cs.Volume.GetVolumeByID(
 		d.Id(),
 		cloudstack.WithProject(d.Get("project").(string)),
+		cloudstack.WithDomain(d.Get("domain").(string)),
 	)
 	if err != nil {
 		return false, err
