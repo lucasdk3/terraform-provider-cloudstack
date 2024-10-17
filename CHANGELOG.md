@@ -1,3 +1,9 @@
+## 0.5.3 (Out 2, 2024)
+
+IMPROVEMENTS:
+
+* Added domain to retrieved id
+
 ## 0.5.2 (Out 2, 2024)
 
 IMPROVEMENTS:

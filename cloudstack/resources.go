@@ -76,6 +76,8 @@ func retrieveID(cs *cloudstack.CloudStackClient, name string, value string, opts
 		id, _, err = cs.NetworkOffering.GetNetworkOfferingID(value)
 	case "project":
 		id, _, err = cs.Project.GetProjectID(value)
+	case "domain":
+		id, _, err = cs.Domain.GetDomainID(value)
 	case "service_offering":
 		id, _, err = cs.ServiceOffering.GetServiceOfferingID(value)
 	case "vpc_offering":
