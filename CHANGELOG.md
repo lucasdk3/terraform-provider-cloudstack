@@ -1,4 +1,14 @@
-## 0.4.0 (Unreleased)
+## 0.7.0 (Unreleased)
+
+FEATURES:
+
+* **New Data Source**: `cloudstack_kubernetes_cluster_config` for retrieving Kubernetes cluster configuration [GH-247]
+
+## 0.6.0 (October 27, 2025)
+
+## 0.5.0 (April 9, 2024)
+
+## 0.4.0 (February 2, 2022)
 
 FEATURES:
 
