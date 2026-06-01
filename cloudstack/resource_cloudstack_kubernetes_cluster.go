@@ -204,7 +204,6 @@ func resourceCloudStackKubernetesCluster() *schema.Resource {
 			"node_offerings": {
 				Type:        schema.TypeMap,
 				Optional:    true,
-				ForceNew:    true,
 				Description: "An optional map of node roles to service offerings. If not specified, the service_offering parameter will be used for all node roles. Valid roles are: worker, control, etcd",
 			},
 
