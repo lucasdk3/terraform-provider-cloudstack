@@ -1,3 +1,9 @@
+## 0.7.4 (June 02, 2026)
+
+BUG FIXES:
+
+* `cloudstack_kubernetes_cluster`: Fix `service_offering` and `node_offerings` update on KVM hypervisors by stopping the cluster, scaling each VM individually via `scaleVirtualMachine`, then restarting — KVM does not support live VM scaling via `scaleKubernetesCluster`
+
 ## 0.7.2 (Unreleased)
 
 FEATURES:

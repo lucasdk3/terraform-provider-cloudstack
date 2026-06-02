@@ -431,7 +431,20 @@ func autoscaleKubernetesCluster(d *schema.ResourceData, meta interface{}) error 
 func resourceCloudStackKubernetesClusterUpdate(d *schema.ResourceData, meta interface{}) error {
 	cs := meta.(*cloudstack.CloudStackClient)
 
-	if d.HasChange("service_offering") || d.HasChange("size") || d.HasChange("node_offerings") {
+	offeringChanged := d.HasChange("service_offering") || d.HasChange("node_offerings")
+
+	// Offering changes require stop → scaleVirtualMachine per VM → start.
+	// KVM does not support live VM scaling, so scaleKubernetesCluster fails when VMs are running.
+	if offeringChanged {
+		if err := scaleKubernetesClusterOfferings(d, meta); err != nil {
+			return err
+		}
+	}
+
+	// Size-only change works with the cluster running via scaleKubernetesCluster.
+	// When offerings also changed, scaleKubernetesClusterOfferings already handled the
+	// lifecycle and new worker nodes spawned by size scaling will use the new offering.
+	if d.HasChange("size") {
 		p := cs.Kubernetes.NewScaleKubernetesClusterParams(d.Id())
 		serviceOfferingID, e := retrieveID(cs, "service_offering", d.Get("service_offering").(string))
 		if e != nil {
@@ -439,26 +452,9 @@ func resourceCloudStackKubernetesClusterUpdate(d *schema.ResourceData, meta inte
 		}
 		p.SetServiceofferingid(serviceOfferingID)
 		p.SetSize(int64(d.Get("size").(int)))
-
-		// Handle node offerings if they changed
-		if nodeOfferings, ok := d.GetOk("node_offerings"); ok {
-			nodeOfferingsMap := nodeOfferings.(map[string]interface{})
-			nodeOfferingsFormatted := make(map[string]string)
-			for nodeType, offeringName := range nodeOfferingsMap {
-				// Retrieve the offering ID
-				offeringID, e := retrieveID(cs, "service_offering", offeringName.(string))
-				if e != nil {
-					return e.Error()
-				}
-				nodeOfferingsFormatted[nodeType] = offeringID
-			}
-			p.SetNodeofferings(nodeOfferingsFormatted)
-		}
-
 		_, err := cs.Kubernetes.ScaleKubernetesCluster(p)
 		if err != nil {
-			return fmt.Errorf(
-				"Error Scaling Kubernetes Cluster %s: %s", d.Id(), err)
+			return fmt.Errorf("Error Scaling Kubernetes Cluster %s: %s", d.Id(), err)
 		}
 	}
 
@@ -482,7 +478,9 @@ func resourceCloudStackKubernetesClusterUpdate(d *schema.ResourceData, meta inte
 		}
 	}
 
-	if d.HasChange("state") {
+	// Skip explicit state transition when offerings changed: scaleKubernetesClusterOfferings
+	// already handled stop/start respecting the desired state.
+	if !offeringChanged && d.HasChange("state") {
 		state := d.Get("state").(string)
 		switch state {
 		case "Running":
@@ -505,6 +503,129 @@ func resourceCloudStackKubernetesClusterUpdate(d *schema.ResourceData, meta inte
 	}
 
 	return resourceCloudStackKubernetesClusterRead(d, meta)
+}
+
+// scaleKubernetesClusterOfferings updates service offerings for all VMs in the cluster.
+// It stops the cluster (required for KVM), scales each VM with scaleVirtualMachine,
+// then restarts if the cluster was running or the desired state is "Running".
+func scaleKubernetesClusterOfferings(d *schema.ResourceData, meta interface{}) error {
+	cs := meta.(*cloudstack.CloudStackClient)
+	clusterID := d.Id()
+	clusterName := d.Get("name").(string)
+	projectID := d.Get("project").(string)
+
+	cluster, _, err := cs.Kubernetes.GetKubernetesClusterByID(
+		clusterID,
+		cloudstack.WithProject(projectID),
+	)
+	if err != nil {
+		return fmt.Errorf("error reading Kubernetes Cluster %s: %s", clusterID, err)
+	}
+
+	wasRunning := cluster.State == "Running"
+
+	if wasRunning {
+		log.Printf("[DEBUG] Stopping Kubernetes Cluster %s to scale offerings", clusterID)
+		stopP := cs.Kubernetes.NewStopKubernetesClusterParams(clusterID)
+		stopR, err := cs.Kubernetes.StopKubernetesCluster(stopP)
+		if err != nil {
+			return fmt.Errorf("error stopping Kubernetes Cluster %s before scaling offerings: %s", clusterID, err)
+		}
+		if !stopR.Success {
+			return fmt.Errorf("failed to stop Kubernetes Cluster %s: %s", clusterID, stopR.Displaytext)
+		}
+		log.Printf("[DEBUG] Kubernetes Cluster %s stopped", clusterID)
+
+		// Re-read to get VMs in their stopped state
+		cluster, _, err = cs.Kubernetes.GetKubernetesClusterByID(
+			clusterID,
+			cloudstack.WithProject(projectID),
+		)
+		if err != nil {
+			return fmt.Errorf("error reading Kubernetes Cluster %s after stop: %s", clusterID, err)
+		}
+	}
+
+	serviceOfferingID, e := retrieveID(cs, "service_offering", d.Get("service_offering").(string))
+	if e != nil {
+		return e.Error()
+	}
+
+	nodeOfferingsIDs := make(map[string]string)
+	if nodeOfferings, ok := d.GetOk("node_offerings"); ok {
+		for role, offeringName := range nodeOfferings.(map[string]interface{}) {
+			id, e := retrieveID(cs, "service_offering", offeringName.(string))
+			if e != nil {
+				return e.Error()
+			}
+			nodeOfferingsIDs[role] = id
+		}
+	}
+
+	for _, vm := range cluster.Virtualmachines {
+		vmRole := extractVMRole(clusterName, vm.Name)
+		if vmRole == "" {
+			log.Printf("[WARN] Skipping VM %s: could not determine role in cluster %s", vm.Name, clusterName)
+			continue
+		}
+		offeringID := resolveOfferingForVMRole(vmRole, serviceOfferingID, nodeOfferingsIDs)
+		log.Printf("[DEBUG] Scaling VM %s (role=%s) to offering %s", vm.Name, vmRole, offeringID)
+		scaleP := cs.VirtualMachine.NewScaleVirtualMachineParams(vm.Id, offeringID)
+		if _, err := cs.VirtualMachine.ScaleVirtualMachine(scaleP); err != nil {
+			return fmt.Errorf("error scaling VM %s in cluster %s: %s", vm.Name, clusterID, err)
+		}
+	}
+
+	desiredState := d.Get("state").(string)
+	shouldStart := (wasRunning && desiredState != "Stopped") || desiredState == "Running"
+	if shouldStart {
+		log.Printf("[DEBUG] Starting Kubernetes Cluster %s after scaling offerings", clusterID)
+		startP := cs.Kubernetes.NewStartKubernetesClusterParams(clusterID)
+		if _, err := cs.Kubernetes.StartKubernetesCluster(startP); err != nil {
+			return fmt.Errorf("error starting Kubernetes Cluster %s after scaling offerings: %s", clusterID, err)
+		}
+		log.Printf("[DEBUG] Kubernetes Cluster %s started", clusterID)
+	}
+
+	return nil
+}
+
+// extractVMRole derives the node role from the VM name using the cluster naming convention:
+// "<cluster-name>-control-<hash>" → "control"
+// "<cluster-name>-node-<hash>"    → "node"
+// "<cluster-name>-etcd-<hash>"    → "etcd"
+func extractVMRole(clusterName, vmName string) string {
+	prefix := clusterName + "-"
+	if !strings.HasPrefix(vmName, prefix) {
+		return ""
+	}
+	rest := strings.TrimPrefix(vmName, prefix)
+	for _, role := range []string{"control", "node", "etcd"} {
+		if strings.HasPrefix(rest, role+"-") || rest == role {
+			return role
+		}
+	}
+	return ""
+}
+
+// resolveOfferingForVMRole returns the service offering ID for a given VM role.
+// VM role "node" (worker) maps to the "worker" key in node_offerings terraform config.
+func resolveOfferingForVMRole(vmRole, defaultID string, nodeOfferingsIDs map[string]string) string {
+	switch vmRole {
+	case "control":
+		if id, ok := nodeOfferingsIDs["control"]; ok {
+			return id
+		}
+	case "node":
+		if id, ok := nodeOfferingsIDs["worker"]; ok {
+			return id
+		}
+	case "etcd":
+		if id, ok := nodeOfferingsIDs["etcd"]; ok {
+			return id
+		}
+	}
+	return defaultID
 }
 
 func resourceCloudStackKubernetesClusterDelete(d *schema.ResourceData, meta interface{}) error {
